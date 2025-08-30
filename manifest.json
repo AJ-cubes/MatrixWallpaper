@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Matrix - Interactive Game",
+  "version": "3.9",
+  "description": "A Matrix-style live wallpaper where cascading code bends around your mouse, and clicks ignite digital firework bursts in an umbrella of glowing numbers.",
+  "chrome_url_overrides": {
+    "newtab": "index.html"
+  },
+  "permissions": [],
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}
