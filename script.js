@@ -11,15 +11,6 @@ const sprouts = [];
 const explosions = [];
 const sproutCount = 8;
 
-let isDesktop = true;
-if (typeof lively !== "undefined" && lively.setWallpaperAudio) {
-    window.addEventListener("blur", () => { isDesktop = false; });
-    window.addEventListener("focus", () => { isDesktop = true; });
-} else {
-    window.addEventListener("blur", () => { isDesktop = false; });
-    window.addEventListener("focus", () => { isDesktop = true; });
-}
-
 function resizeCanvas() {
     const dpr = window.devicePixelRatio || 1;
     width = window.innerWidth;
@@ -65,7 +56,6 @@ function getGreenShade() {
 }
 
 canvas.addEventListener('click', e => {
-    if (!isDesktop) return;
     triggerSproutExplosion(e.clientX, e.clientY);
 });
 
