@@ -3,13 +3,26 @@ const ctx = canvas.getContext('2d');
 
 let width = window.innerWidth;
 let height = window.innerHeight;
-const fontSize = 20;
-const dropsPerColumn = 6;
-let columns, drops, dropChars;
+let dropsPerColumn, columns, drops, dropChars, resetGrow, growingIndex, resetShrink, shrinkingIndex, resetButtonCircle, sproutCount, bubbleRadius, fontSize;
 
 const sprouts = [];
 const explosions = [];
-const sproutCount = 8;
+
+function getExplosionCounterBox() {
+    const text = `Explosion Count: ${explosionCount}`;
+    ctx.font = "22px 'Pixelify Sans', monospace";
+    const padding = 12;
+    const framePad = 50;
+    const metrics = ctx.measureText(text);
+    const textWidth = metrics.width;
+    const textHeight = 28;
+    const boxWidth = textWidth + padding * 2;
+    const boxHeight = textHeight + padding * 2;
+    const frameX = width - boxWidth - framePad;
+    const frameY = framePad;
+
+    return { frameX, frameY, boxWidth, boxHeight };
+}
 
 function resizeCanvas() {
     const dpr = window.devicePixelRatio || 1;
@@ -22,7 +35,12 @@ function resizeCanvas() {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(dpr, dpr);
 
-    columns = Math.floor(width / fontSize);
+    const minDim = Math.min(width, height);
+    fontSize = Math.round(minDim / 30);
+    bubbleRadius = Math.floor(minDim / (fontSize * 0.5));
+    dropsPerColumn = Math.floor(minDim / (fontSize * 5));
+    sproutCount = Math.floor(minDim / (fontSize * 3.5));
+    columns = Math.floor(width / (fontSize));
     drops = Array.from({length: columns}, () => Array(dropsPerColumn).fill(1));
     dropChars = Array.from({length: columns}, () =>
         Array.from({length: dropsPerColumn}, () => (Math.random() < 0.5 ? '0' : '1'))
@@ -32,7 +50,6 @@ function resizeCanvas() {
 resizeCanvas();
 
 let mouse = { x: width / 2, y: height / 2 };
-const bubbleRadius = 50;
 const speed = 0.125;
 
 window.addEventListener('resize', resizeCanvas);
@@ -56,12 +73,71 @@ function getGreenShade() {
 }
 
 canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    const dx = clickX - resetButtonCircle.x;
+    const dy = clickY - resetButtonCircle.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist <= resetButtonCircle.radius) {
+        explosionCount = 0;
+        localStorage.setItem('explosionCount', explosionCount);
+        resizeCanvas();
+        return;
+    }
+
+    const { frameX, frameY, boxWidth, boxHeight } = getExplosionCounterBox();
+
+    if (
+        clickX >= frameX && clickX <= frameX + boxWidth &&
+        clickY >= frameY && clickY <= frameY + boxHeight
+    ) {
+        return;
+    }
+
     triggerSproutExplosion(e.clientX, e.clientY);
 });
 
-let explosionCount = 0;
+canvas.addEventListener('mousedown', e => {
+    const rect = canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
 
-function drawExplosionCounter() {
+    const dx = clickX - resetButtonCircle.x;
+    const dy = clickY - resetButtonCircle.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist <= resetButtonCircle.radius) {
+        resetGrow = true;
+        resetShrink = false;
+        growingIndex = 0;
+        shrinkingIndex = 0;
+    }
+})
+
+canvas.addEventListener('mouseup', e => {
+    const rect = canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    const dx = clickX - resetButtonCircle.x;
+    const dy = clickY - resetButtonCircle.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist <= resetButtonCircle.radius) {
+        resetGrow = false;
+        resetShrink = true;
+        growingIndex = dropsPerColumn;
+        shrinkingIndex = dropsPerColumn;
+    }
+})
+
+let explosionCount = localStorage.getItem('explosionCount') || 0;
+localStorage.setItem('explosionCount', explosionCount);
+
+function drawExplosionCounterAndResetButton() {
     const text = `Explosion Count: ${explosionCount}`;
     ctx.save();
     ctx.font = "22px 'Pixelify Sans', monospace";
@@ -97,7 +173,7 @@ function drawExplosionCounter() {
     ctx.closePath();
 
     ctx.setLineDash([5, 5]);
-    ctx.lineDashOffset = 0;
+    ctx.lineDashOffset = performance.now() / -25;
     ctx.strokeStyle = "#00FF46";
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
@@ -113,7 +189,54 @@ function drawExplosionCounter() {
     ctx.font = "22px monospace";
     ctx.fillText(explosionCount, x + padding + labelWidth, y + padding);
 
+    const circleRadius = boxHeight / 2;
+    const circleX = x - circleRadius * 2.5;
+    const circleY = y + boxHeight / 2;
+
+    const dx = mouse.x - circleX;
+    const dy = mouse.y - circleY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const isHovering = dist < circleRadius;
+
+    let pulseRadius = circleRadius;
+    if (resetGrow === true) {
+        growingIndex++;
+        if (growingIndex > dropsPerColumn) growingIndex = dropsPerColumn;
+        pulseRadius += growingIndex;
+    }
+    if (resetShrink === true) {
+        shrinkingIndex--;
+        if (shrinkingIndex < 0) shrinkingIndex = 0;
+        pulseRadius += shrinkingIndex;
+    }
+
+    ctx.shadowColor = isHovering ? "#00FF46" : "#003F1F";
+    ctx.shadowBlur = isHovering ? 16 : 6;
+
+    ctx.beginPath();
+    ctx.arc(circleX, circleY, pulseRadius, 0, 2 * Math.PI);
+    ctx.fillStyle = "#000";
+    ctx.fill();
+    ctx.setLineDash([5, 5])
+    ctx.lineDashOffset = performance.now() / -25;
+    ctx.strokeStyle = "#00FF46";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.font = "30px 'Pixelify Sans', monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#00FF46";
+    ctx.fillText("↺", circleX, circleY);
+
     ctx.restore();
+
+    resetButtonCircle = {
+        x: circleX,
+        y: circleY,
+        radius: circleRadius
+    };
 }
 
 function triggerSproutExplosion(x, y) {
@@ -143,6 +266,7 @@ function drawBubble() {
     ctx.save();
     ctx.beginPath();
     ctx.setLineDash([4, 6]);
+    ctx.lineDashOffset = performance.now() / -25;
     ctx.strokeStyle = "#00FF46";
     ctx.lineWidth = 2;
     ctx.arc(mouse.x, mouse.y, bubbleRadius, 0, 2 * Math.PI);
@@ -157,7 +281,9 @@ function isOnScreen(x, y) {
 
 function spawnExplosion(x, y, color) {
     if (isOnScreen(x, y)) {
+        explosionCount = localStorage.getItem('explosionCount') || 0;
         explosionCount++;
+        localStorage.setItem('explosionCount', explosionCount);
     }
     for (let i = 0; i < 4; i++) {
         const angle = Math.random() * 2 * Math.PI;
@@ -213,19 +339,9 @@ function draw() {
 
     drawBubble();
     drawExplosions();
-    drawExplosionCounter();
+    drawExplosionCounterAndResetButton();
 
-    const text = `Explosion Count: ${explosionCount}`;
-    ctx.font = "22px 'Pixelify Sans', monospace";
-    const padding = 12;
-    const framePad = 50;
-    const metrics = ctx.measureText(text);
-    const textWidth = metrics.width;
-    const textHeight = 28;
-    const boxWidth = textWidth + padding * 2;
-    const boxHeight = textHeight + padding * 2;
-    const frameX = width - boxWidth - framePad;
-    const frameY = framePad;
+    const { frameX, frameY, boxWidth, boxHeight } = getExplosionCounterBox();
 
     for (let i = sprouts.length - 1; i >= 0; i--) {
         const s = sprouts[i];
@@ -283,11 +399,16 @@ function draw() {
             let dy = y - mouse.y;
             let dist = Math.sqrt(dx * dx + dy * dy);
 
+            const dxReset = x - resetButtonCircle.x;
+            const dyReset = y - resetButtonCircle.y;
+            const distReset = Math.sqrt(dxReset * dxReset + dyReset * dyReset);
+
             let shade = getGreenShade();
 
             if (
-                x >= frameX && x <= frameX + boxWidth &&
-                y >= frameY && y <= frameY + boxHeight
+                (x >= frameX && x <= frameX + boxWidth &&
+                    y >= frameY && y <= frameY + boxHeight) ||
+                distReset < resetButtonCircle.radius
             ) {
             } else if (dist < bubbleRadius) {
                 let angle = Math.atan2(dy, dx);
