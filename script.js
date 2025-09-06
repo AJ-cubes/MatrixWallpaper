@@ -118,15 +118,7 @@ canvas.addEventListener('mousedown', e => {
 })
 
 canvas.addEventListener('mouseup', e => {
-    const rect = canvas.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
-
-    const dx = clickX - resetButtonCircle.x;
-    const dy = clickY - resetButtonCircle.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
-    if (dist <= resetButtonCircle.radius) {
+    if (resetGrow === true) {
         resetGrow = false;
         resetShrink = true;
         growingIndex = dropsPerColumn;
@@ -212,6 +204,7 @@ function drawExplosionCounterAndResetButton() {
 
     ctx.shadowColor = isHovering ? "#00FF46" : "#003F1F";
     ctx.shadowBlur = isHovering ? 16 : 6;
+    canvas.style.cursor = isHovering ? "pointer" : "default";
 
     ctx.beginPath();
     ctx.arc(circleX, circleY, pulseRadius, 0, 2 * Math.PI);
